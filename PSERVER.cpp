@@ -1,18 +1,6 @@
 #include "PSERVER.h"
 #include "ServException.h"
 
-PSERVER::PSERVER() {
-	try
-	{
-		initSockets();
-		createLisSocket();
-		startServer();
-	}
-	catch (const ServException& ex)
-	{
-		std::cout << ex.GetErrorType() << ex.GetErrorCode() << std::endl;
-	}
-}
 
 PSERVER::~PSERVER() {
 	stopServer();
@@ -38,13 +26,13 @@ void PSERVER::createLisSocket()
 
 void PSERVER::transSockAddr(in_addr* ip_addr)
 {
-	errState = inet_pton(AF_INET, "192.168.1.104", ip_addr);
-	if (true) {
+	errState = inet_pton(AF_INET, "127.0.0.1", ip_addr);
+	if (errState <= 0) {
 		throw ServException("Socket address translation error");
 	}
 }
 
-void PSERVER::startServer()
+void PSERVER::bindSocket()
 {
 	in_addr ip_addr;
 	try
@@ -55,6 +43,8 @@ void PSERVER::startServer()
 	{
 		throw;
 	}
+
+	sockaddr_in servInfo;
 	ZeroMemory(&servInfo, sizeof(servInfo));
 	servInfo.sin_family = AF_INET;
 	servInfo.sin_port = htons(4444);
@@ -62,19 +52,47 @@ void PSERVER::startServer()
 
 	errState = bind(lis_socket, (sockaddr*)&servInfo, sizeof(servInfo));
 	if (errState != 0) {
-		std::cout << "Binding error: ";
-		std::cout << WSAGetLastError() << std::endl;
-		return;
+		throw ServException("Binding error: ", WSAGetLastError());
 	}
+}
 
+void PSERVER::listenState()
+{
 	errState = listen(lis_socket, SOMAXCONN);
 	if (errState != 0) {
-		std::cout << "Listening error: ";
-		std::cout << WSAGetLastError() << std::endl;
-		return;
+		throw ServException("Listening error: ", WSAGetLastError());
 	}
-	else {
-		std::cout << "Server in listening state" << std::endl;
+	std::cout << "Server in listening state" << std::endl;
+}
+
+void PSERVER::acceptConnection()
+{
+	sockaddr_in clientInfo;
+	int clientInfo_size = sizeof(clientInfo);
+	ZeroMemory(&clientInfo, clientInfo_size);
+
+	SOCKET client_socket = accept(lis_socket, (sockaddr*)&clientInfo, &clientInfo_size);
+	if (client_socket == INVALID_SOCKET) {
+		closesocket(client_socket);
+		throw ServException("Client connection error: ", WSAGetLastError());
+	}
+	std::cout << "Client has been connected" << std::endl;
+}
+
+void PSERVER::startServer()
+{
+	try
+	{
+		initSockets();
+		createLisSocket();
+		bindSocket();
+		listenState();
+
+		acceptConnection();
+	}
+	catch (const ServException& ex)
+	{
+		std::cout << ex.GetErrorType() << ex.GetErrorCode() << std::endl;
 	}
 }
 
