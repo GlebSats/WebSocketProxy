@@ -1,4 +1,4 @@
-#include "ClientP.h"
+#include "Client.h"
 #include "ClientException.h"
 
 CLIENT::~CLIENT()
