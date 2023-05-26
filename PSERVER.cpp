@@ -24,9 +24,9 @@ void PSERVER::createLisSocket()
 
 }
 
-void PSERVER::transSockAddr(in_addr* ip_addr)
+void PSERVER::transSockAddr(const char* ip_string, in_addr* ip_addr)
 {
-	errState = inet_pton(AF_INET, "127.0.0.1", ip_addr);
+	errState = inet_pton(AF_INET, ip_string, ip_addr);
 	if (errState <= 0) {
 		throw ServException("Socket address translation error");
 	}
@@ -83,6 +83,14 @@ void PSERVER::acceptConnection()
 }
 }
 
+void PSERVER::createWebSocket()
+{
+	web_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (web_socket == INVALID_SOCKET) {
+		throw ServException("Socket initialization error: ", WSAGetLastError());
+	}
+}
+
 void PSERVER::startServer()
 {
 	try
@@ -90,7 +98,7 @@ void PSERVER::startServer()
 		initSockets();
 		createLisSocket();
 		bindSocket();
-		listenState();
+		is_listen = listenState();
 
 		acceptConnection();
 	}
