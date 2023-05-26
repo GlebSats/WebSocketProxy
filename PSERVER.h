@@ -13,14 +13,16 @@ public:
 private:
 	void initSockets();
 	void createLisSocket();
-	void transSockAddr(in_addr* ip_addr);
+	void transSockAddr(const char* ip_string, in_addr* ip_addr);
 	void bindSocket();
 	bool listenState();
 	void acceptConnection();
+	void createWebSocket();
 	void stopServer();
 private:
 	SOCKET lis_socket;
 	SOCKET client_socket;
+	SOCKET web_socket;
 	WSADATA wsData;
 	int errState;
 	int client_counter;
