@@ -59,7 +59,7 @@ void PSERVER::bindSocket()
 bool PSERVER::listenState()
 {
 	errState = listen(lis_socket, SOMAXCONN);
-	if (true) {
+	if (errState != 0) {
 		throw ServException("Listening error: ", WSAGetLastError());
 	}
 	std::cout << "Server in listening state..." << std::endl;
