@@ -56,13 +56,14 @@ void PSERVER::bindSocket()
 	}
 }
 
-void PSERVER::listenState()
+bool PSERVER::listenState()
 {
 	errState = listen(lis_socket, SOMAXCONN);
-	if (errState != 0) {
+	if (true) {
 		throw ServException("Listening error: ", WSAGetLastError());
 	}
-	std::cout << "Server in listening state" << std::endl;
+	std::cout << "Server in listening state..." << std::endl;
+	return true;
 }
 
 void PSERVER::acceptConnection()
@@ -76,7 +77,10 @@ void PSERVER::acceptConnection()
 		closesocket(client_socket);
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
+	client_counter++;
 	std::cout << "Client has been connected" << std::endl;
+	std::cout << "Number of connected clients: " << client_counter << std::endl;
+}
 }
 
 void PSERVER::startServer()
@@ -98,7 +102,12 @@ void PSERVER::startServer()
 
 void PSERVER::stopServer()
 {
-	closesocket(lis_socket);
+	if (client_counter > 0) {
+		closesocket(client_socket);
+	}
+	if (is_listen) {
+		closesocket(lis_socket);
+	}
 	WSACleanup();
 }
 
