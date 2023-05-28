@@ -15,10 +15,10 @@ void PSERVER::initSockets()
 	}
 }
 
-void PSERVER::createLisSocket()
+void PSERVER::createNewSocket(SOCKET& new_socket)
 {
-	lis_socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (lis_socket == INVALID_SOCKET) {
+	new_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (new_socket == INVALID_SOCKET) {
 		throw ServException("Socket initialization error: ", WSAGetLastError());
 	}
 
@@ -37,7 +37,7 @@ void PSERVER::bindSocket()
 	in_addr ip_addr;
 	try
 	{
-		transSockAddr(&ip_addr);
+		transSockAddr("127.0.0.1", &ip_addr);
 	}
 	catch (const ServException& ex)
 	{
@@ -56,14 +56,13 @@ void PSERVER::bindSocket()
 	}
 }
 
-bool PSERVER::listenState()
+void PSERVER::listenState()
 {
 	errState = listen(lis_socket, SOMAXCONN);
 	if (errState != 0) {
 		throw ServException("Listening error: ", WSAGetLastError());
 	}
 	std::cout << "Server in listening state..." << std::endl;
-	return true;
 }
 
 void PSERVER::acceptConnection()
@@ -77,17 +76,39 @@ void PSERVER::acceptConnection()
 		closesocket(client_socket);
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
-	client_counter++;
 	std::cout << "Client has been connected" << std::endl;
-	std::cout << "Number of connected clients: " << client_counter << std::endl;
-}
 }
 
-void PSERVER::createWebSocket()
+void PSERVER::connectToWebServ()
 {
-	web_socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (web_socket == INVALID_SOCKET) {
-		throw ServException("Socket initialization error: ", WSAGetLastError());
+	in_addr ip_addr;
+	try
+	{
+		transSockAddr("91.121.93.94", &ip_addr);
+	}
+	catch (const std::exception&)
+	{
+		throw;
+	}
+
+	sockaddr_in servInfo;
+	ZeroMemory(&servInfo, sizeof(servInfo));
+
+	servInfo.sin_family = AF_INET;
+	servInfo.sin_port = htons(8080);
+	servInfo.sin_addr = ip_addr;
+
+	errState = connect(web_socket, (sockaddr*)&servInfo, sizeof(servInfo));
+	if (errState != 0) {
+		throw ServException("Connection to Web Server failed: ", WSAGetLastError());
+	}
+	std::cout << "Connection to Web Server successful" << std::endl;
+}
+
+void PSERVER::sockCommunication()
+{
+	while (true) {
+
 	}
 }
 
@@ -96,11 +117,14 @@ void PSERVER::startServer()
 	try
 	{
 		initSockets();
-		createLisSocket();
+		createNewSocket(lis_socket);
 		bindSocket();
-		is_listen = listenState();
+		listenState();
 
 		acceptConnection();
+		//test
+		createNewSocket(web_socket);
+		connectToWebServ();
 	}
 	catch (const ServException& ex)
 	{
@@ -110,10 +134,13 @@ void PSERVER::startServer()
 
 void PSERVER::stopServer()
 {
-	if (client_counter > 0) {
+	if (web_socket != INVALID_SOCKET) {
+		closesocket(web_socket);
+	}
+	if (client_socket != INVALID_SOCKET) {
 		closesocket(client_socket);
 	}
-	if (is_listen) {
+	if (lis_socket != INVALID_SOCKET) {
 		closesocket(lis_socket);
 	}
 	WSACleanup();
