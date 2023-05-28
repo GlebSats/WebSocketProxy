@@ -6,18 +6,19 @@
 class PSERVER
 {
 public:
-	PSERVER():client_counter(0), is_listen(false){}
+	PSERVER() :lis_socket(-1), client_socket(-1), web_socket(-1), errState(0){}
 	~PSERVER();
 	void startServer();
 
 private:
 	void initSockets();
-	void createLisSocket();
+	void createNewSocket(SOCKET& new_socket);
 	void transSockAddr(const char* ip_string, in_addr* ip_addr);
 	void bindSocket();
-	bool listenState();
+	void listenState();
 	void acceptConnection();
-	void createWebSocket();
+	void connectToWebServ();
+	void sockCommunication();
 	void stopServer();
 private:
 	SOCKET lis_socket;
@@ -25,7 +26,4 @@ private:
 	SOCKET web_socket;
 	WSADATA wsData;
 	int errState;
-	int client_counter;
-	bool is_listen;
 };
-
