@@ -1,6 +1,7 @@
 #include "PSERVER.h"
 #include "ServException.h"
 
+#define BUFFER_SIZE 1024
 
 PSERVER::~PSERVER() {
 	stopServer();
@@ -107,8 +108,11 @@ void PSERVER::connectToWebServ()
 
 void PSERVER::sockCommunication()
 {
+	char buffer[BUFFER_SIZE] = {};
+	int packet_size = 0;
 	while (true) {
-
+		packet_size = recv(client_socket, buffer, BUFFER_SIZE, 0);
+		send(web_socket, buffer, packet_size, 0);
 	}
 }
 
@@ -125,6 +129,7 @@ void PSERVER::startServer()
 		//test
 		createNewSocket(web_socket);
 		connectToWebServ();
+		sockCommunication();
 	}
 	catch (const ServException& ex)
 	{
@@ -145,5 +150,4 @@ void PSERVER::stopServer()
 	}
 	WSACleanup();
 }
-
 
