@@ -74,7 +74,6 @@ void PSERVER::acceptConnection()
 
 	client_socket = accept(lis_socket, (sockaddr*)&clientInfo, &clientInfo_size);
 	if (client_socket == INVALID_SOCKET) {
-		closesocket(client_socket);
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
 	std::cout << "Client has been connected" << std::endl;
@@ -112,7 +111,29 @@ void PSERVER::sockCommunication()
 	int packet_size = 0;
 	while (true) {
 		packet_size = recv(client_socket, buffer, BUFFER_SIZE, 0);
-		send(web_socket, buffer, packet_size, 0);
+		if (packet_size == SOCKET_ERROR) {
+			shutdown(web_socket, SD_RECEIVE);
+			shutdown(client_socket, SD_SEND);
+			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+		}
+		packet_size = send(web_socket, buffer, packet_size, 0);
+		if (packet_size == SOCKET_ERROR) {
+			shutdown(web_socket, SD_RECEIVE);
+			shutdown(client_socket, SD_SEND);
+			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+		}
+		packet_size = recv(web_socket, buffer, BUFFER_SIZE, 0);
+		if (packet_size == SOCKET_ERROR) {
+			shutdown(web_socket, SD_RECEIVE);
+			shutdown(client_socket, SD_SEND);
+			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+		}
+		packet_size = send(client_socket, buffer, packet_size, 0);
+		if (packet_size == SOCKET_ERROR) {
+			shutdown(web_socket, SD_RECEIVE);
+			shutdown(client_socket, SD_SEND);
+			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+		}
 	}
 }
 
@@ -124,12 +145,19 @@ void PSERVER::startServer()
 		createNewSocket(lis_socket);
 		bindSocket();
 		listenState();
-
-		acceptConnection();
-		//test
-		createNewSocket(web_socket);
-		connectToWebServ();
-		sockCommunication();
+		while (true) {
+			try
+			{
+				acceptConnection();
+				createNewSocket(web_socket);
+				connectToWebServ();
+				sockCommunication();
+			}
+			catch (const ServException& ex)
+			{
+				std::cout << ex.GetErrorType() << ex.GetErrorCode() << std::endl;
+			}
+		}
 	}
 	catch (const ServException& ex)
 	{
