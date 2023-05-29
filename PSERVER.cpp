@@ -71,7 +71,7 @@ void PSERVER::acceptConnection()
 	int clientInfo_size = sizeof(clientInfo);
 	ZeroMemory(&clientInfo, clientInfo_size);
 
-	SOCKET client_socket = accept(lis_socket, (sockaddr*)&clientInfo, &clientInfo_size);
+	client_socket = accept(lis_socket, (sockaddr*)&clientInfo, &clientInfo_size);
 	if (client_socket == INVALID_SOCKET) {
 		closesocket(client_socket);
 		throw ServException("Client connection error: ", WSAGetLastError());
