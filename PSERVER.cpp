@@ -126,13 +126,13 @@ void PSERVER::sockCommunication()
 		if (packet_size == SOCKET_ERROR) {
 			shutdown(web_socket, SD_BOTH);
 			shutdown(client_socket, SD_BOTH);
-			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 		}
 		packet_size = send(client_socket, buffer, packet_size, 0);
 		if (packet_size == SOCKET_ERROR) {
 			shutdown(web_socket, SD_BOTH);
 			shutdown(client_socket, SD_BOTH);
-			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 		}
 	}
 }
