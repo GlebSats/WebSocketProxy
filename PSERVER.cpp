@@ -112,26 +112,26 @@ void PSERVER::sockCommunication()
 	while (true) {
 		packet_size = recv(client_socket, buffer, BUFFER_SIZE, 0);
 		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_RECEIVE);
-			shutdown(client_socket, SD_SEND);
+			shutdown(web_socket, SD_BOTH);
+			shutdown(client_socket, SD_BOTH);
 			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 		}
 		packet_size = send(web_socket, buffer, packet_size, 0);
 		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_RECEIVE);
-			shutdown(client_socket, SD_SEND);
+			shutdown(web_socket, SD_BOTH);
+			shutdown(client_socket, SD_BOTH);
 			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 		}
 		packet_size = recv(web_socket, buffer, BUFFER_SIZE, 0);
 		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_RECEIVE);
-			shutdown(client_socket, SD_SEND);
+			shutdown(web_socket, SD_BOTH);
+			shutdown(client_socket, SD_BOTH);
 			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 		}
 		packet_size = send(client_socket, buffer, packet_size, 0);
 		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_RECEIVE);
-			shutdown(client_socket, SD_SEND);
+			shutdown(web_socket, SD_BOTH);
+			shutdown(client_socket, SD_BOTH);
 			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 		}
 	}
