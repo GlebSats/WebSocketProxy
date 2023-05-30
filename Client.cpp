@@ -1,5 +1,6 @@
-#include "Client.h"
+#include "ClientP.h"
 #include "ClientException.h"
+
 
 CLIENT::~CLIENT()
 {
@@ -13,6 +14,7 @@ void CLIENT::startClient()
 		initSockets();
 		createClientSocket();
 		connectToServ();
+		sockCommunication();
 	}
 	catch (const ClientException& ex)
 	{
@@ -69,6 +71,15 @@ void CLIENT::connectToServ()
 		throw ClientException("Connection failed: ", WSAGetLastError());
 	}
 	std::cout << "Connection successful" << std::endl;
+}
+
+void CLIENT::sockCommunication()
+{
+	char buffer[6] = "Hello";
+	while (true) {
+		std::cin.getline(buffer, 6);
+		send(client_socket, buffer, 6, 0);
+	}
 }
 
 void CLIENT::stopClient()
