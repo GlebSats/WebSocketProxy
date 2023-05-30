@@ -15,9 +15,11 @@ private:
 	void createClientSocket();
 	void transSockAddr(in_addr* ip_addr);
 	void connectToServ();
+	void sockCommunication();
 	void stopClient();
 private:
 	SOCKET client_socket;
 	WSADATA wsData;
 	int errState;
 };
+
