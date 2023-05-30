@@ -84,7 +84,7 @@ void PSERVER::connectToWebServ()
 	in_addr ip_addr;
 	try
 	{
-		transSockAddr("91.121.93.94", &ip_addr);
+		transSockAddr("127.0.0.1", &ip_addr);
 	}
 	catch (const std::exception&)
 	{
@@ -95,7 +95,7 @@ void PSERVER::connectToWebServ()
 	ZeroMemory(&servInfo, sizeof(servInfo));
 
 	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(8080);
+	servInfo.sin_port = htons(4445);
 	servInfo.sin_addr = ip_addr;
 
 	errState = connect(web_socket, (sockaddr*)&servInfo, sizeof(servInfo));
@@ -109,31 +109,46 @@ void PSERVER::sockCommunication()
 {
 	char buffer[BUFFER_SIZE] = {};
 	int packet_size = 0;
+	fd_set sendset;
+	FD_ZERO(&sendset);
+	FD_SET(client_socket, &sendset);
+	FD_SET(web_socket, &sendset);
+
 	while (true) {
-		packet_size = recv(client_socket, buffer, BUFFER_SIZE, 0);
-		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_BOTH);
-			shutdown(client_socket, SD_BOTH);
-			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+		
+		int readySock = select(0, &sendset, nullptr, nullptr, nullptr);
+		if (readySock == SOCKET_ERROR) {
+			throw ServException("Select runtime error: ", WSAGetLastError());
 		}
-		packet_size = send(web_socket, buffer, packet_size, 0);
-		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_BOTH);
-			shutdown(client_socket, SD_BOTH);
-			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+		if (FD_ISSET(web_socket, &sendset)) {
+			packet_size = recv(web_socket, buffer, BUFFER_SIZE, 0);
+			if (packet_size == SOCKET_ERROR) {
+				shutdown(web_socket, SD_RECEIVE);
+				shutdown(client_socket, SD_SEND);
+				throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+			}
+			packet_size = send(client_socket, buffer, packet_size, 0);
+			if (packet_size == SOCKET_ERROR) {
+				shutdown(web_socket, SD_RECEIVE);
+				shutdown(client_socket, SD_SEND);
+				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+			}
 		}
-		packet_size = recv(web_socket, buffer, BUFFER_SIZE, 0);
-		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_BOTH);
-			shutdown(client_socket, SD_BOTH);
-			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+		if (FD_ISSET(client_socket, &sendset)) {
+			packet_size = recv(client_socket, buffer, BUFFER_SIZE, 0);
+			if (packet_size == SOCKET_ERROR) {
+				shutdown(web_socket, SD_RECEIVE);
+				shutdown(client_socket, SD_SEND);
+				throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+			}
+			packet_size = send(web_socket, buffer, packet_size, 0);
+			if (packet_size == SOCKET_ERROR) {
+				shutdown(web_socket, SD_RECEIVE);
+				shutdown(client_socket, SD_SEND);
+				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+			}
 		}
-		packet_size = send(client_socket, buffer, packet_size, 0);
-		if (packet_size == SOCKET_ERROR) {
-			shutdown(web_socket, SD_BOTH);
-			shutdown(client_socket, SD_BOTH);
-			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
-		}
+		
 	}
 }
 
