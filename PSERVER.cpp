@@ -16,6 +16,19 @@ void PSERVER::initSockets()
 	}
 }
 
+void PSERVER::createSockInfo(const char* ip, const char* port, addrinfo* sockInfo)
+{
+	addrinfo addrInfo;
+	ZeroMemory(&addrInfo, sizeof(addrInfo));
+	addrInfo.ai_family = AF_INET;
+	addrInfo.ai_socktype = SOCK_STREAM;
+	addrInfo.ai_protocol = IPPROTO_TCP;
+	errState = getaddrinfo(ip, port, &addrInfo, &sockInfo);
+	if (errState != 0) {
+		throw ServException("err fun crea: ", WSAGetLastError());
+	}
+}
+
 void PSERVER::createNewSocket(SOCKET& new_socket)
 {
 	new_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -84,7 +97,7 @@ void PSERVER::connectToWebServ()
 	in_addr ip_addr;
 	try
 	{
-		transSockAddr("127.0.0.1", &ip_addr);
+		transSockAddr("142.251.36.142", &ip_addr);
 	}
 	catch (const std::exception&)
 	{
@@ -95,7 +108,7 @@ void PSERVER::connectToWebServ()
 	ZeroMemory(&servInfo, sizeof(servInfo));
 
 	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(4445);
+	servInfo.sin_port = htons(443);
 	servInfo.sin_addr = ip_addr;
 
 	errState = connect(web_socket, (sockaddr*)&servInfo, sizeof(servInfo));
@@ -109,16 +122,19 @@ void PSERVER::sockCommunication()
 {
 	char buffer[BUFFER_SIZE] = {};
 	int packet_size = 0;
+
 	fd_set sendset;
 	FD_ZERO(&sendset);
 	FD_SET(client_socket, &sendset);
 	FD_SET(web_socket, &sendset);
 
 	while (true) {
-		
+
 		int readySock = select(0, &sendset, nullptr, nullptr, nullptr);
 		if (readySock == SOCKET_ERROR) {
 			throw ServException("Select runtime error: ", WSAGetLastError());
+			shutdown(web_socket, SD_RECEIVE);
+			shutdown(client_socket, SD_SEND);
 		}
 		if (FD_ISSET(web_socket, &sendset)) {
 			packet_size = recv(web_socket, buffer, BUFFER_SIZE, 0);
@@ -148,7 +164,6 @@ void PSERVER::sockCommunication()
 				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 			}
 		}
-		
 	}
 }
 
@@ -157,6 +172,9 @@ void PSERVER::startServer()
 	try
 	{
 		initSockets();
+		//
+		createSockInfo("const char* ip", "const char* port", lisSockInfo);
+		//
 		createNewSocket(lis_socket);
 		bindSocket();
 		listenState();
