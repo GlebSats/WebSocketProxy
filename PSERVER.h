@@ -12,8 +12,8 @@ public:
 
 private:
 	void initSockets();
-	void createSockInfo(const char* ip, const char* port, addrinfo* sockInfo);
-	void createNewSocket(SOCKET& new_socket);
+	void createSockInfo(const char* ip, const char* port, addrinfo** sockInfo);
+	void createNewSocket(SOCKET& new_socket, addrinfo* sockInfo);
 	void transSockAddr(const char* ip_string, in_addr* ip_addr);
 	void bindSocket();
 	void listenState();
