@@ -16,20 +16,20 @@ void PSERVER::initSockets()
 	}
 }
 
-void PSERVER::createSockInfo(const char* ip, const char* port, addrinfo* sockInfo)
+void PSERVER::createSockInfo(const char* ip, const char* port, addrinfo** sockInfo)
 {
 	addrinfo addrInfo;
 	ZeroMemory(&addrInfo, sizeof(addrInfo));
 	addrInfo.ai_family = AF_INET;
 	addrInfo.ai_socktype = SOCK_STREAM;
 	addrInfo.ai_protocol = IPPROTO_TCP;
-	errState = getaddrinfo(ip, port, &addrInfo, &sockInfo);
+	errState = getaddrinfo(ip, port, &addrInfo, sockInfo);
 	if (errState != 0) {
-		throw ServException("err fun crea: ", WSAGetLastError());
+		throw ServException("Error getting address information: ", WSAGetLastError());
 	}
 }
 
-void PSERVER::createNewSocket(SOCKET& new_socket)
+void PSERVER::createNewSocket(SOCKET& new_socket, addrinfo* sockInfo)
 {
 	new_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (new_socket == INVALID_SOCKET) {
@@ -38,33 +38,9 @@ void PSERVER::createNewSocket(SOCKET& new_socket)
 
 }
 
-void PSERVER::transSockAddr(const char* ip_string, in_addr* ip_addr)
-{
-	errState = inet_pton(AF_INET, ip_string, ip_addr);
-	if (errState <= 0) {
-		throw ServException("Socket address translation error");
-	}
-}
-
 void PSERVER::bindSocket()
 {
-	in_addr ip_addr;
-	try
-	{
-		transSockAddr("127.0.0.1", &ip_addr);
-	}
-	catch (const ServException& ex)
-	{
-		throw;
-	}
-
-	sockaddr_in servInfo;
-	ZeroMemory(&servInfo, sizeof(servInfo));
-	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(4444);
-	servInfo.sin_addr = ip_addr;
-
-	errState = bind(lis_socket, (sockaddr*)&servInfo, sizeof(servInfo));
+	errState = bind(lis_socket, lisSockInfo->ai_addr, lisSockInfo->ai_addrlen);
 	if (errState != 0) {
 		throw ServException("Binding error: ", WSAGetLastError());
 	}
@@ -81,37 +57,21 @@ void PSERVER::listenState()
 
 void PSERVER::acceptConnection()
 {
-	sockaddr_in clientInfo;
-	int clientInfo_size = sizeof(clientInfo);
-	ZeroMemory(&clientInfo, clientInfo_size);
-
-	client_socket = accept(lis_socket, (sockaddr*)&clientInfo, &clientInfo_size);
+	char ipStr[INET_ADDRSTRLEN];
+	sockaddr_in clientSockInfo;
+	ZeroMemory(&clientSockInfo, sizeof(clientSockInfo));
+	int clientSize = sizeof(clientSockInfo);
+	client_socket = accept(lis_socket, (sockaddr*) & clientSockInfo, &clientSize);
 	if (client_socket == INVALID_SOCKET) {
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
-	std::cout << "Client has been connected" << std::endl;
+	inet_ntop(clientSockInfo.sin_family, &(clientSockInfo.sin_addr), ipStr, INET_ADDRSTRLEN);
+	std::cout << "Client: " << ipStr << " has been connected" << std::endl;
 }
 
 void PSERVER::connectToWebServ()
 {
-	in_addr ip_addr;
-	try
-	{
-		transSockAddr("142.251.36.142", &ip_addr);
-	}
-	catch (const std::exception&)
-	{
-		throw;
-	}
-
-	sockaddr_in servInfo;
-	ZeroMemory(&servInfo, sizeof(servInfo));
-
-	servInfo.sin_family = AF_INET;
-	servInfo.sin_port = htons(443);
-	servInfo.sin_addr = ip_addr;
-
-	errState = connect(web_socket, (sockaddr*)&servInfo, sizeof(servInfo));
+	errState = connect(web_socket, webSockInfo->ai_addr, webSockInfo->ai_addrlen);
 	if (errState != 0) {
 		throw ServException("Connection to Web Server failed: ", WSAGetLastError());
 	}
@@ -173,16 +133,19 @@ void PSERVER::startServer()
 	{
 		initSockets();
 		//
-		createSockInfo("const char* ip", "const char* port", lisSockInfo);
+		createSockInfo("127.0.0.1", "4444", &lisSockInfo);
 		//
-		createNewSocket(lis_socket);
+		createNewSocket(lis_socket, lisSockInfo);
 		bindSocket();
 		listenState();
 		while (true) {
 			try
 			{
 				acceptConnection();
-				createNewSocket(web_socket);
+				//
+				createSockInfo("127.0.0.1", "4445", &webSockInfo);
+				//
+				createNewSocket(web_socket, webSockInfo);
 				connectToWebServ();
 				sockCommunication();
 			}
@@ -200,6 +163,8 @@ void PSERVER::startServer()
 
 void PSERVER::stopServer()
 {
+	freeaddrinfo(webSockInfo);
+	freeaddrinfo(lisSockInfo);
 	if (web_socket != INVALID_SOCKET) {
 		closesocket(web_socket);
 	}
