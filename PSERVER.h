@@ -19,6 +19,7 @@ private:
 	void acceptConnection();
 	void connectToWebServ();
 	void sockCommunication();
+	void closeConnection();
 	void stopServer();
 private:
 	addrinfo* lisSockInfo;
