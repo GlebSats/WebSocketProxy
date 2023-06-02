@@ -91,30 +91,22 @@ void PSERVER::sockCommunication()
 	FD_SET(web_socket, &sendset);
 
 	while (true) {
-
 		int readySock = select(0, &sendset, nullptr, nullptr, nullptr);
 		if (readySock == SOCKET_ERROR) {
-			throw ServException("Select runtime error: ", WSAGetLastError());
-			shutdown(web_socket, SD_RECEIVE);
-			shutdown(client_socket, SD_SEND);
+			closeConnection();
+			throw ServException("Select function error: ", WSAGetLastError());
 		}
 		if (FD_ISSET(web_socket, &sendset)) {
 			do
 			{
 				rec_data = recv(web_socket, buffer, BUFFER_SIZE, 0);
 				if (rec_data == SOCKET_ERROR) {
-					shutdown(web_socket, SD_RECEIVE);
-					shutdown(client_socket, SD_SEND);
-					closesocket(web_socket);
-					closesocket(client_socket);
+					closeConnection();
 					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 				}
 				send_data = send(client_socket, buffer, BUFFER_SIZE, 0);
 				if (send_data == SOCKET_ERROR) {
-					shutdown(web_socket, SD_RECEIVE);
-					shutdown(client_socket, SD_SEND);
-					closesocket(web_socket);
-					closesocket(client_socket);
+					closeConnection();
 					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 				}
 				memset(buffer, 0, BUFFER_SIZE);
@@ -125,24 +117,26 @@ void PSERVER::sockCommunication()
 			{
 				rec_data = recv(client_socket, buffer, BUFFER_SIZE, 0);
 				if (rec_data == SOCKET_ERROR) {
-					shutdown(web_socket, SD_RECEIVE);
-					shutdown(client_socket, SD_SEND);
-					closesocket(web_socket);
-					closesocket(client_socket);
+					closeConnection();
 					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 				}
 				send_data = send(web_socket, buffer, BUFFER_SIZE, 0);
 				if (send_data == SOCKET_ERROR) {
-					shutdown(web_socket, SD_RECEIVE);
-					shutdown(client_socket, SD_SEND);
-					closesocket(web_socket);
-					closesocket(client_socket);
+					closeConnection();
 					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 				}
 				memset(buffer, 0, BUFFER_SIZE);
 			} while (rec_data == BUFFER_SIZE);
 		}
 	}
+}
+
+void PSERVER::closeConnection()
+{
+	shutdown(web_socket, SD_BOTH);
+	shutdown(client_socket, SD_BOTH);
+	closesocket(web_socket);
+	closesocket(client_socket);
 }
 
 void PSERVER::startServer()
