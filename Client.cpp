@@ -75,10 +75,10 @@ void CLIENT::connectToServ()
 
 void CLIENT::sockCommunication()
 {
-	char buffer[6] = "Hello";
+	std::string s;
 	while (true) {
-		std::cin.getline(buffer, 6);
-		send(client_socket, buffer, 6, 0);
+		std::getline(std::cin, s);
+		send(client_socket, s.c_str(), s.size(), 0);
 	}
 }
 
