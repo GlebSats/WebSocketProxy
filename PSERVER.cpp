@@ -61,7 +61,7 @@ void PSERVER::acceptConnection()
 	sockaddr_in clientSockInfo;
 	ZeroMemory(&clientSockInfo, sizeof(clientSockInfo));
 	int clientSize = sizeof(clientSockInfo);
-	client_socket = accept(lis_socket, (sockaddr*) & clientSockInfo, &clientSize);
+	client_socket = accept(lis_socket, (sockaddr*)&clientSockInfo, &clientSize);
 	if (client_socket == INVALID_SOCKET) {
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
@@ -81,16 +81,15 @@ void PSERVER::connectToWebServ()
 void PSERVER::sockCommunication()
 {
 	char buffer[BUFFER_SIZE];
-	memset(buffer, 0, BUFFER_SIZE);
+	ZeroMemory(&buffer, sizeof(buffer));
 	int rec_data = 0;
 	int send_data = 0;
 
-	fd_set sendset;
-	FD_ZERO(&sendset);
-	FD_SET(client_socket, &sendset);
-	FD_SET(web_socket, &sendset);
-
 	while (true) {
+		fd_set sendset;
+		FD_ZERO(&sendset);
+		FD_SET(client_socket, &sendset);
+		FD_SET(web_socket, &sendset);
 		int readySock = select(0, &sendset, nullptr, nullptr, nullptr);
 		if (readySock == SOCKET_ERROR) {
 			closeConnection();
@@ -104,12 +103,16 @@ void PSERVER::sockCommunication()
 					closeConnection();
 					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 				}
-				send_data = send(client_socket, buffer, BUFFER_SIZE, 0);
+				if (rec_data == 0) {
+					closeConnection();
+					throw ServException("Connection has been closed from server: ", WSAGetLastError());
+				}
+				send_data = send(client_socket, buffer, rec_data, 0);
 				if (send_data == SOCKET_ERROR) {
 					closeConnection();
 					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 				}
-				memset(buffer, 0, BUFFER_SIZE);
+				ZeroMemory(&buffer, sizeof(buffer));
 			} while (rec_data == BUFFER_SIZE);
 		}
 		if (FD_ISSET(client_socket, &sendset)) {
@@ -120,12 +123,16 @@ void PSERVER::sockCommunication()
 					closeConnection();
 					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 				}
-				send_data = send(web_socket, buffer, BUFFER_SIZE, 0);
+				if (rec_data == 0) {
+					closeConnection();
+					throw ServException("Connection has been closed from client: ", WSAGetLastError());
+				}
+				send_data = send(web_socket, buffer, rec_data, 0);
 				if (send_data == SOCKET_ERROR) {
 					closeConnection();
 					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 				}
-				memset(buffer, 0, BUFFER_SIZE);
+				ZeroMemory(&buffer, sizeof(buffer));
 			} while (rec_data == BUFFER_SIZE);
 		}
 	}
@@ -144,9 +151,7 @@ void PSERVER::startServer()
 	try
 	{
 		initSockets();
-		//
 		createSockInfo("127.0.0.1", "4444", &lisSockInfo);
-		//
 		createNewSocket(lis_socket, lisSockInfo);
 		bindSocket();
 		listenState();
@@ -154,9 +159,7 @@ void PSERVER::startServer()
 			try
 			{
 				acceptConnection();
-				//
-				createSockInfo("127.0.0.1", "4445", &webSockInfo);
-				//
+				createSockInfo("127.0.0.1", "1883", &webSockInfo);
 				createNewSocket(web_socket, webSockInfo);
 				connectToWebServ();
 				sockCommunication();
