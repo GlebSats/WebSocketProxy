@@ -1,0 +1,20 @@
+#include <iostream>
+#include <Windows.h>
+#include <tchar.h>
+
+SERVICE_STATUS serviceStatus;
+SERVICE_STATUS_HANDLE serviceStatusHandle;
+
+VOID WINAPI ServiceStatusHandler(DWORD controlCode) {
+
+}
+
+VOID WINAPI ServiceMain(DWORD Argc, LPSTR* Argv) {
+    
+}
+
+int _tmain(int argc, TCHAR *argv[])
+{
+    
+    return 0;
+}
