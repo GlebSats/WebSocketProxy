@@ -1,20 +1,106 @@
-#include <iostream>
 #include <Windows.h>
 #include <tchar.h>
-
+#include <strsafe.h>
+// Global Variables
+TCHAR SVCNAME[] = L"winService";
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle;
-
-VOID WINAPI ServiceStatusHandler(DWORD controlCode) {
-
-}
-
-VOID WINAPI ServiceMain(DWORD Argc, LPSTR* Argv) {
-    
-}
-
-int _tmain(int argc, TCHAR *argv[])
+// Windows Service Functions
+VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv);
+VOID WINAPI winServiceHandler(DWORD controlCode);
+VOID ReportWinServiceStatus(DWORD CurrentState, DWORD Win32ExitCode, DWORD WaitHint);
+VOID InitWinService(DWORD Argc, LPTSTR* Argv);
+VOID SvcInstall();
+VOID SvcUninstall();
+//
+int _tmain(int argc, TCHAR* argv[])
 {
-    
+    if (lstrcmpi(argv[1], TEXT("install")) == 0)
+    {
+        SvcInstall();
+        return 0;
+    }
+    else if (lstrcmpi(argv[1], TEXT("uninstall")) == 0) {
+        SvcUninstall();
+        return 0;
+    }
+    else {
+        SERVICE_TABLE_ENTRY DispatchTable[] =
+        {
+            { SVCNAME, (LPSERVICE_MAIN_FUNCTION)winServiceMain},
+            { NULL, NULL }
+        };
+
+        if (!StartServiceCtrlDispatcher(DispatchTable))
+        {
+            //SvcReportEvent(TEXT("StartServiceCtrlDispatcher"));
+        }
+    }
     return 0;
+}
+
+VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv) {
+    serviceStatusHandle = RegisterServiceCtrlHandlerW(SVCNAME, winServiceHandler);
+    if (serviceStatusHandle == 0) {
+        //SvcReportEvent(TEXT("RegisterServiceCtrlHandler"));
+        return;
+    }
+
+    serviceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    serviceStatus.dwServiceSpecificExitCode = 0;
+
+    ReportWinServiceStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
+
+    InitWinService(Argc, Argv);
+}
+
+VOID WINAPI winServiceHandler(DWORD controlCode) {
+
+}
+
+VOID ReportWinServiceStatus(DWORD CurrentState, DWORD Win32ExitCode, DWORD WaitHint) {
+
+}
+
+VOID InitWinService(DWORD Argc, LPTSTR* Argv) {
+
+}
+
+VOID SvcInstall() {
+    SC_HANDLE hSCManager, hService;
+    TCHAR UnquotedPath[MAX_PATH];
+    
+    if (!GetModuleFileName(NULL, UnquotedPath, MAX_PATH))
+    {
+        printf("Cannot install service (%d)\n", GetLastError());
+        return;
+    }
+
+    TCHAR szPath[MAX_PATH];
+    StringCbPrintf(szPath, MAX_PATH, TEXT("\"%s\""), UnquotedPath);
+
+    hSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+    if (hSCManager == NULL)
+    {
+        printf("OpenSCManager failed (%d)\n", GetLastError());
+        return;
+    }
+
+    hService = CreateService(hSCManager, SVCNAME, SVCNAME, SC_MANAGER_ALL_ACCESS, 
+        SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, szPath, NULL, NULL, NULL, NULL, NULL);
+    if (hService == NULL) {
+        printf("CreateService failed (%d)\n", GetLastError());
+        CloseServiceHandle(hSCManager);
+        return;
+    }
+    else {
+        printf("Service installed successfully\n");
+    }
+
+    CloseServiceHandle(hService);
+    CloseServiceHandle(hSCManager);
+}
+
+VOID SvcUninstall() {
+
 }
