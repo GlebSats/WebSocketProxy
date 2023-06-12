@@ -25,18 +25,18 @@ int _tmain(int argc, TCHAR* argv[])
         SvcUninstall();
         return 0;
     }
-    else {
-        SERVICE_TABLE_ENTRY DispatchTable[] =
-        {
-            { SVCNAME, (LPSERVICE_MAIN_FUNCTION)winServiceMain},
-            { NULL, NULL }
-        };
 
-        if (!StartServiceCtrlDispatcher(DispatchTable))
-        {
-            //SvcReportEvent(TEXT("StartServiceCtrlDispatcher"));
-        }
+    SERVICE_TABLE_ENTRY DispatchTable[] =
+    {
+        { SVCNAME, (LPSERVICE_MAIN_FUNCTION)winServiceMain},
+        { NULL, NULL }
+    };
+
+    if (!StartServiceCtrlDispatcher(DispatchTable))
+    {
+        //SvcReportEvent(TEXT("StartServiceCtrlDispatcher"));
     }
+
     return 0;
 }
 
