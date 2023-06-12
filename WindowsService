@@ -122,7 +122,7 @@ VOID SvcInstall() {
         printf("OpenSCManager failed (%d)\n", GetLastError());
         return;
     }
-
+    // nebo SERVICE_AUTO_START
     hService = CreateService(hSCManager, SVCNAME, SVCNAME, SERVICE_ALL_ACCESS,
         SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, szPath, NULL, NULL, NULL, NULL, NULL);
     if (hService == NULL) {
