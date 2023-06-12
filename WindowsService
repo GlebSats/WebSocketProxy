@@ -5,10 +5,11 @@
 TCHAR SVCNAME[] = L"winService";
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle;
+HANDLE serviceStopEvent = NULL;
 // Windows Service Functions
 VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv);
 VOID WINAPI winServiceHandler(DWORD controlCode);
-VOID ReportWinServiceStatus(DWORD CurrentState, DWORD Win32ExitCode, DWORD WaitHint);
+VOID ReportWinServiceStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint);
 VOID InitWinService(DWORD Argc, LPTSTR* Argv);
 VOID SvcInstall();
 VOID SvcUninstall();
@@ -58,18 +59,54 @@ VOID WINAPI winServiceHandler(DWORD controlCode) {
 
 }
 
-VOID ReportWinServiceStatus(DWORD CurrentState, DWORD Win32ExitCode, DWORD WaitHint) {
+VOID ReportWinServiceStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint) {
+    static DWORD dwCheckPoint = 1;
 
+    serviceStatus.dwCurrentState = dwCurrentState;
+    serviceStatus.dwWin32ExitCode = dwWin32ExitCode;
+    serviceStatus.dwWaitHint = dwWaitHint;
+
+    if (dwCurrentState == SERVICE_START_PENDING) {
+        serviceStatus.dwControlsAccepted = 0;
+    }
+    else {
+        serviceStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP;
+    }
+
+    if ((dwCurrentState == SERVICE_RUNNING) || (dwCurrentState == SERVICE_STOPPED)) {
+        serviceStatus.dwCheckPoint = 0;
+    }
+    else {
+        serviceStatus.dwCheckPoint = dwCheckPoint++;
+    }
+
+    SetServiceStatus(serviceStatusHandle, &serviceStatus);
 }
 
 VOID InitWinService(DWORD Argc, LPTSTR* Argv) {
-
+    
+    serviceStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (serviceStopEvent == NULL) {
+        ReportWinServiceStatus(SERVICE_STOPPED, GetLastError(), 0);
+    }
+    else {
+        //
+        PSERVER proxyServer;
+        proxyServer.start(); // možná bude "bool" 
+        //
+        ReportWinServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
+        
+        while (1) {
+            WaitForSingleObject(serviceStopEvent, INFINITE);
+            ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+        }
+    }
 }
 
 VOID SvcInstall() {
     SC_HANDLE hSCManager, hService;
     TCHAR UnquotedPath[MAX_PATH];
-    
+
     if (!GetModuleFileName(NULL, UnquotedPath, MAX_PATH))
     {
         printf("Cannot install service (%d)\n", GetLastError());
@@ -79,14 +116,14 @@ VOID SvcInstall() {
     TCHAR szPath[MAX_PATH];
     StringCbPrintf(szPath, MAX_PATH, TEXT("\"%s\""), UnquotedPath);
 
-    hSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS); 
+    hSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (hSCManager == NULL)
     {
         printf("OpenSCManager failed (%d)\n", GetLastError());
         return;
     }
 
-    hService = CreateService(hSCManager, SVCNAME, SVCNAME, SC_MANAGER_ALL_ACCESS, 
+    hService = CreateService(hSCManager, SVCNAME, SVCNAME, SERVICE_ALL_ACCESS,
         SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, szPath, NULL, NULL, NULL, NULL, NULL);
     if (hService == NULL) {
         printf("CreateService failed (%d)\n", GetLastError());
@@ -102,5 +139,32 @@ VOID SvcInstall() {
 }
 
 VOID SvcUninstall() {
+    SC_HANDLE hSCManager, hService;
 
+    hSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (hSCManager == NULL)
+    {
+        printf("OpenSCManager failed (%d)\n", GetLastError());
+        return;
+    }
+
+    hService = OpenService(hSCManager, SVCNAME, SERVICE_ALL_ACCESS);
+    if (hService == NULL) {
+        printf("OpenService failed (%d)\n", GetLastError());
+        CloseServiceHandle(hSCManager);
+        return;
+    }
+
+    if (!DeleteService(hService)) {
+        printf("DeleteService failed (%d)\n", GetLastError());
+        CloseServiceHandle(hService);
+        CloseServiceHandle(hSCManager);
+        return;
+    }
+    else {
+        printf("Service uninstalled successfully\n");
+        CloseServiceHandle(hService);
+        CloseServiceHandle(hSCManager);
+        return;
+    }
 }
