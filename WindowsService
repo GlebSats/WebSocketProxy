@@ -25,19 +25,19 @@ int _tmain(int argc, TCHAR* argv[])
         SvcUninstall();
         return 0;
     }
+    else {
+        SERVICE_TABLE_ENTRY DispatchTable[] =
+        {
+            { SVCNAME, (LPSERVICE_MAIN_FUNCTION)winServiceMain},
+            { NULL, NULL }
+        };
 
-    SERVICE_TABLE_ENTRY DispatchTable[] =
-    {
-        { SVCNAME, (LPSERVICE_MAIN_FUNCTION)winServiceMain},
-        { NULL, NULL }
-    };
-
-    if (!StartServiceCtrlDispatcher(DispatchTable))
-    {
-        //SvcReportEvent(TEXT("StartServiceCtrlDispatcher"));
+        if (!StartServiceCtrlDispatcher(DispatchTable))
+        {
+            //SvcReportEvent(TEXT("StartServiceCtrlDispatcher"));
+        }
+        return 0;
     }
-
-    return 0;
 }
 
 VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv) {
@@ -57,6 +57,16 @@ VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv) {
 
 VOID WINAPI winServiceHandler(DWORD controlCode) {
 
+    switch (controlCode)
+    {
+
+    case SERVICE_CONTROL_STOP:
+        SetEvent(serviceStopEvent);
+        ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+
+    default:
+        break;
+    }
 }
 
 VOID ReportWinServiceStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint) {
@@ -91,15 +101,14 @@ VOID InitWinService(DWORD Argc, LPTSTR* Argv) {
     }
     else {
         //
-        PSERVER proxyServer;
-        proxyServer.start(); // možná bude "bool" 
+        // Funkce initSockets - listenState
         //
         ReportWinServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
         
-        while (1) {
-            WaitForSingleObject(serviceStopEvent, INFINITE);
-            ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+        while (WaitForSingleObject(serviceStopEvent, 0) != WAIT_OBJECT_0) {
+            // Funkce acceptConnection - sockCommunication
         }
+        ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
     }
 }
 
