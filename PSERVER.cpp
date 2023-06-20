@@ -158,7 +158,135 @@ void PSERVER::closeConnection()
 	closesocket(web_socket);
 	closesocket(client_socket);
 }
+//
+void PSERVER::sockCommunication() {
+	char bufToClient[BUFFER_SIZE];
+	char bufToServer[BUFFER_SIZE];
+	ZeroMemory(&bufToClient, sizeof(bufToClient));
+	ZeroMemory(&bufToServer, sizeof(bufToServer));
+	int dataForClient = 0;
+	int dataForServer = 0;
+	int indexForClient = 0;
+	int indexForServer = 0;
 
+	bufToClientHasData = WSACreateEvent();
+	if (bufToClientHasData == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	bufToServHasData = WSACreateEvent();
+	if (bufToServHasData == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	clientReadySend = WSACreateEvent();
+	if (clientReadySend == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+	serverReadySend = WSACreateEvent();
+	if (serverReadySend == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	if (WSAEventSelect(client_socket, clientReadySend, FD_READ) != 0) {
+		WSACloseEvent(clientReadySend);
+		closeConnection();
+		throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
+	}
+
+	if (WSAEventSelect(server_socket, serverReadySend, FD_READ) != 0) {
+		WSACloseEvent(serverReadySend);
+		closeConnection();
+		throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
+	}
+
+	while (true) {
+		
+		HANDLE eventArr[4] = { clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
+
+		int eventResult = WSAWaitForMultipleEvents(4, eventArr, FALSE, INFINITE, FALSE);
+		if (eventResult == WSA_WAIT_FAILED) {
+			closeConnection();
+			throw ServException("Error while waiting for events: ", WSAGetLastError());
+		}
+		
+		if (eventResult == WSA_WAIT_EVENT_0 && dataForServer == 0) {
+			int rec_data = recv(client_socket, bufToServer, BUFFER_SIZE, 0);
+			if (rec_data == SOCKET_ERROR) {
+				closeConnection();
+				throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+			}
+			if (rec_data < BUFFER_SIZE) {
+				WSAResetEvent(clientReadySend);
+			}
+			dataForServer = rec_data;
+			indexForServer = 0;
+		}
+
+		if ((eventResult == WSA_WAIT_EVENT_0 + 1) && (dataForClient == 0)) {
+			int rec_data = recv(server_socket, bufToClient, BUFFER_SIZE, 0);
+			if (rec_data == SOCKET_ERROR) {
+				closeConnection();
+				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+			}
+			if (rec_data < BUFFER_SIZE) {
+				WSAResetEvent(serverReadySend);
+			}
+			dataForClient = rec_data;
+			indexForClient = 0;
+		}
+
+		if ((eventResult == WSA_WAIT_EVENT_0 + 2) || (dataForServer != 0)) {
+			int send_data = send(server_socket, bufToServer + indexForServer, dataForServer, 0);
+			if (send_data == SOCKET_ERROR) {
+				closeConnection();
+				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+			}
+			dataForServer -= send_data;
+			indexForServer += send_data;
+		}
+
+		if ((eventResult == WSA_WAIT_EVENT_0 + 3) || (dataForClient != 0)) {
+			int send_data = send(client_socket, bufToClient + indexForClient, dataForClient, 0);
+			if (send_data == SOCKET_ERROR) {
+				closeConnection();
+				throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+			}
+			dataForClient -= send_data;
+			indexForClient += send_data;
+		}
+
+		if (dataForClient != 0) {
+			WSASetEvent(bufToClientHasData);
+		}
+		else {
+			WSAResetEvent(bufToClientHasData);
+		}
+
+		if (dataForServer != 0) {
+			WSASetEvent(bufToServHasData);
+		}
+		else {
+			WSAResetEvent(bufToServHasData);
+		}
+	}
+}
+void PSERVER::closeConnection()
+{
+	WSACloseEvent(bufToClientHasData);
+	WSACloseEvent(bufToServHasData);
+	WSACloseEvent(clientReadySend);
+	WSACloseEvent(serverReadySend);
+	shutdown(server_socket, SD_BOTH);
+	shutdown(client_socket, SD_BOTH);
+	closesocket(server_socket);
+	closesocket(client_socket);
+}
+//
 void PSERVER::startServer()
 {
 	try
