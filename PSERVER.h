@@ -2,11 +2,15 @@
 #include <iostream>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <cstring>
 
 class PSERVER
 {
 public:
-	PSERVER() :lis_socket(-1), client_socket(-1), web_socket(-1), errState(0) {}
+	PSERVER() :lis_socket(-1), client_socket(-1), server_socket(-1), errState(0), bufToClientHasData(WSA_INVALID_EVENT),
+		bufToServHasData(WSA_INVALID_EVENT), clientReadySend(WSA_INVALID_EVENT), serverReadySend(WSA_INVALID_EVENT)
+	{
+	}
 	~PSERVER();
 	void startServer();
 
@@ -21,12 +25,18 @@ private:
 	void sockCommunication();
 	void closeConnection();
 	void stopServer();
+public:
+	static HANDLE serviceStopEvent;
 private:
 	addrinfo* lisSockInfo;
 	addrinfo* webSockInfo;
 	SOCKET lis_socket;
 	SOCKET client_socket;
-	SOCKET web_socket;
+	SOCKET server_socket;
+	WSAEVENT bufToClientHasData;
+	WSAEVENT bufToServHasData;
+	WSAEVENT clientReadySend;
+	WSAEVENT serverReadySend;
 	WSADATA wsData;
 	int errState;
 };
