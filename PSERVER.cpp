@@ -204,7 +204,7 @@ void PSERVER::sockCommunication() {
 			throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
 		}
 
-		HANDLE eventArr[4] = { clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
+		HANDLE eventArr[5] = { serviceStopEvent, clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
 
 		int eventResult = WSAWaitForMultipleEvents(4, eventArr, FALSE, INFINITE, FALSE);
 		if (eventResult == WSA_WAIT_FAILED) {
@@ -212,7 +212,12 @@ void PSERVER::sockCommunication() {
 			throw ServException("Error while waiting for events: ", WSAGetLastError());
 		}
 		
-		if (eventResult == WSA_WAIT_EVENT_0 && dataForServer == 0) {
+		if (eventResult == WSA_WAIT_EVENT_0) {
+			closeConnection();
+			throw ServException("Connection has been severed: ", WSAGetLastError());
+		}
+
+		if ((eventResult == WSA_WAIT_EVENT_0 + 1) && (dataForServer == 0)) {
 			int rec_data = recv(client_socket, bufToServer, BUFFER_SIZE, 0);
 			if (rec_data == SOCKET_ERROR) {
 				closeConnection();
@@ -225,7 +230,7 @@ void PSERVER::sockCommunication() {
 			indexForServer = 0;
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 1) && (dataForClient == 0)) {
+		if ((eventResult == WSA_WAIT_EVENT_0 + 2) && (dataForClient == 0)) {
 			int rec_data = recv(server_socket, bufToClient, BUFFER_SIZE, 0);
 			if (rec_data == SOCKET_ERROR) {
 				closeConnection();
@@ -238,7 +243,7 @@ void PSERVER::sockCommunication() {
 			indexForClient = 0;
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 2) || (dataForServer != 0)) {
+		if ((eventResult == WSA_WAIT_EVENT_0 + 3) || (dataForServer != 0)) {
 			int send_data = send(server_socket, bufToServer + indexForServer, dataForServer, 0);
 			if (send_data == SOCKET_ERROR) {
 				closeConnection();
@@ -248,7 +253,7 @@ void PSERVER::sockCommunication() {
 			indexForServer += send_data;
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 3) || (dataForClient != 0)) {
+		if ((eventResult == WSA_WAIT_EVENT_0 + 4) || (dataForClient != 0)) {
 			int send_data = send(client_socket, bufToClient + indexForClient, dataForClient, 0);
 			if (send_data == SOCKET_ERROR) {
 				closeConnection();
