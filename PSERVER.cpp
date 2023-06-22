@@ -1,7 +1,10 @@
 #include "PSERVER.h"
 #include "ServException.h"
+#include "writeLog.h"
+#include <string>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 5
+HANDLE PSERVER::serviceStopEvent = NULL;
 
 PSERVER::~PSERVER() {
 	stopServer();
@@ -52,7 +55,7 @@ void PSERVER::listenState()
 	if (errState != 0) {
 		throw ServException("Listening error: ", WSAGetLastError());
 	}
-	std::cout << "Server in listening state..." << std::endl;
+	writeLog("Server in listening state...");
 }
 
 void PSERVER::acceptConnection()
@@ -61,104 +64,97 @@ void PSERVER::acceptConnection()
 	sockaddr_in clientSockInfo;
 	ZeroMemory(&clientSockInfo, sizeof(clientSockInfo));
 	int clientSize = sizeof(clientSockInfo);
-	client_socket = accept(lis_socket, (sockaddr*)&clientSockInfo, &clientSize);
+	client_socket = accept(lis_socket, (sockaddr*) & clientSockInfo, &clientSize);
 	if (client_socket == INVALID_SOCKET) {
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
 	inet_ntop(clientSockInfo.sin_family, &(clientSockInfo.sin_addr), ipStr, INET_ADDRSTRLEN);
-	std::cout << "Client: " << ipStr << " has been connected" << std::endl;
+	std::string strIP(ipStr);
+	writeLog("Client: " + strIP + " has been connected");
 }
 
 void PSERVER::connectToWebServ()
 {
-	errState = connect(web_socket, webSockInfo->ai_addr, webSockInfo->ai_addrlen);
+	errState = connect(server_socket, webSockInfo->ai_addr, webSockInfo->ai_addrlen);
 	if (errState != 0) {
 		throw ServException("Connection to Web Server failed: ", WSAGetLastError());
 	}
-	std::cout << "Connection to Web Server successful" << std::endl;
+	writeLog("Connection to Server successful");
 }
 
-void PSERVER::sockCommunication()
-{
-	char bufToClient[BUFFER_SIZE];
-	char bufToServer[BUFFER_SIZE];
-	ZeroMemory(&bufToClient, sizeof(bufToClient));
-	ZeroMemory(&bufToServer, sizeof(bufToServer));
-	int dataForClient = 0;
-	int dataForServer = 0;
-	int indexForClient = 0;
-	int indexForServer = 0;
-
-	while (true) {
-		fd_set sendset;
-		FD_ZERO(&sendset);
-		FD_SET(client_socket, &sendset);
-		FD_SET(server_socket, &sendset);
-		fd_set recset;
-		FD_ZERO(&recset);
-		FD_SET(client_socket, &recset);
-		FD_SET(server_socket, &recset);
-		timeval timeout{ 0, 0 };
-		int readySock = select(0, &sendset, nullptr, /*&recset,*/ nullptr, &timeout);
-		if (readySock == SOCKET_ERROR) {
-			closeConnection();
-			throw ServException("Select function error: ", WSAGetLastError());
-		}
-		if (FD_ISSET(server_socket, &sendset)) {
-			if (dataForClient == 0) {
-				int rec_data = recv(server_socket, bufToClient, BUFFER_SIZE, 0);
-				if (rec_data == SOCKET_ERROR) {
-					closeConnection();
-					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
-				}
-				dataForClient = rec_data;
-				indexForClient = 0;
-			}
-		}
-		if (FD_ISSET(client_socket, &sendset)) {
-			if (dataForServer == 0) {
-				int rec_data = recv(client_socket, bufToServer, BUFFER_SIZE, 0);
-				if (rec_data == SOCKET_ERROR) {
-					closeConnection();
-					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
-				}
-				dataForServer = rec_data;
-				indexForServer = 0;
-			}
-		}
-		if (FD_ISSET(server_socket, &recset)) {
-			if (dataForServer > 0) {
-				int send_data = send(server_socket, bufToServer + indexForServer, dataForServer, 0);
-				if (send_data == SOCKET_ERROR) {
-					closeConnection();
-					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
-				}
-				dataForServer -= send_data;
-				indexForServer += send_data;
-			}
-		}
-		if (FD_ISSET(client_socket, &recset)) {
-			if (dataForClient > 0) {
-				int send_data = send(client_socket, bufToClient + indexForClient, dataForClient, 0);
-				if (send_data == SOCKET_ERROR) {
-					closeConnection();
-					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
-				}
-				dataForClient -= send_data;
-				indexForClient += send_data;
-			}
-		}
-	}
-}
-
-void PSERVER::closeConnection()
-{
-	shutdown(web_socket, SD_BOTH);
-	shutdown(client_socket, SD_BOTH);
-	closesocket(web_socket);
-	closesocket(client_socket);
-}
+//void PSERVER::sockCommunication()
+//{
+//	char bufToClient[BUFFER_SIZE];
+//	char bufToServer[BUFFER_SIZE];
+//	ZeroMemory(&bufToClient, sizeof(bufToClient));
+//	ZeroMemory(&bufToServer, sizeof(bufToServer));
+//	int dataForClient = 0;
+//	int dataForServer = 0;
+//	int indexForClient = 0;
+//	int indexForServer = 0;
 //
+//	while (true) {
+//		fd_set sendset;
+//		FD_ZERO(&sendset);
+//		FD_SET(client_socket, &sendset);
+//		FD_SET(server_socket, &sendset);
+//		fd_set recset;
+//		FD_ZERO(&recset);
+//		FD_SET(client_socket, &recset);
+//		FD_SET(server_socket, &recset);
+//		timeval timeout{ 1, 0 };
+//		int readySock = select(0, &sendset, nullptr, /*&recset,*/ nullptr, &timeout);
+//		if (readySock == SOCKET_ERROR) {
+//			closeConnection();
+//			throw ServException("Select function error: ", WSAGetLastError());
+//		}
+//		if (FD_ISSET(server_socket, &sendset)) {
+//			if (dataForClient == 0) {
+//				int rec_data = recv(server_socket, bufToClient, BUFFER_SIZE, 0);
+//				if (rec_data == SOCKET_ERROR) {
+//					closeConnection();
+//					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+//				}
+//				dataForClient = rec_data;
+//				indexForClient = 0;
+//			}
+//		}
+//		if (FD_ISSET(client_socket, &sendset)) {
+//			if (dataForServer == 0) {
+//				int rec_data = recv(client_socket, bufToServer, BUFFER_SIZE, 0);
+//				if (rec_data == SOCKET_ERROR) {
+//					closeConnection();
+//					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+//				}
+//				dataForServer = rec_data;
+//				indexForServer = 0;
+//			}
+//		}
+//		if (FD_ISSET(server_socket, &recset)) {
+//			if (dataForServer > 0) {
+//				int send_data = send(server_socket, bufToServer + indexForServer, dataForServer, 0);
+//				if (send_data == SOCKET_ERROR) {
+//					closeConnection();
+//					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+//				}
+//				dataForServer -= send_data;
+//				indexForServer += send_data;
+//			}
+//		}
+//		if (FD_ISSET(client_socket, &recset)) {
+//			if (dataForClient > 0) {
+//				int send_data = send(client_socket, bufToClient + indexForClient, dataForClient, 0);
+//				if (send_data == SOCKET_ERROR) {
+//					closeConnection();
+//					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+//				}
+//				dataForClient -= send_data;
+//				indexForClient += send_data;
+//			}
+//		}
+//	}
+//}
+
 void PSERVER::sockCommunication() {
 	char bufToClient[BUFFER_SIZE];
 	char bufToServer[BUFFER_SIZE];
@@ -206,7 +202,7 @@ void PSERVER::sockCommunication() {
 
 		HANDLE eventArr[5] = { serviceStopEvent, clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
 
-		int eventResult = WSAWaitForMultipleEvents(4, eventArr, FALSE, INFINITE, FALSE);
+		int eventResult = WSAWaitForMultipleEvents(5, eventArr, FALSE, INFINITE, FALSE);
 		if (eventResult == WSA_WAIT_FAILED) {
 			closeConnection();
 			throw ServException("Error while waiting for events: ", WSAGetLastError());
@@ -292,13 +288,15 @@ void PSERVER::closeConnection()
 	closesocket(server_socket);
 	closesocket(client_socket);
 }
-//
+
 void PSERVER::startServer()
 {
 	try
 	{
 		initSockets();
+		//
 		createSockInfo("127.0.0.1", "4444", &lisSockInfo);
+		//
 		createNewSocket(lis_socket, lisSockInfo);
 		bindSocket();
 		listenState();
@@ -306,20 +304,22 @@ void PSERVER::startServer()
 			try
 			{
 				acceptConnection();
-				createSockInfo("127.0.0.1", "1883", &webSockInfo);
-				createNewSocket(web_socket, webSockInfo);
+				createSockInfo("127.0.0.1", "4445", &webSockInfo);
+				createNewSocket(server_socket, webSockInfo);
 				connectToWebServ();
 				sockCommunication();
 			}
 			catch (const ServException& ex)
 			{
-				std::cout << ex.GetErrorType() << ex.GetErrorCode() << std::endl;
+				std::string ErrorCode = std::to_string(ex.GetErrorCode());
+				writeLog(ex.GetErrorType() + ErrorCode);
 			}
 		}
 	}
 	catch (const ServException& ex)
 	{
-		std::cout << ex.GetErrorType() << ex.GetErrorCode() << std::endl;
+		std::string ErrorCode = std::to_string(ex.GetErrorCode());
+		writeLog(ex.GetErrorType() + ErrorCode);
 	}
 }
 
@@ -327,8 +327,8 @@ void PSERVER::stopServer()
 {
 	freeaddrinfo(webSockInfo);
 	freeaddrinfo(lisSockInfo);
-	if (web_socket != INVALID_SOCKET) {
-		closesocket(web_socket);
+	if (server_socket != INVALID_SOCKET) {
+		closesocket(server_socket);
 	}
 	if (client_socket != INVALID_SOCKET) {
 		closesocket(client_socket);
