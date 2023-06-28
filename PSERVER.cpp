@@ -4,7 +4,6 @@
 #include <string>
 
 #define BUFFER_SIZE 5
-HANDLE PSERVER::serviceStopEvent = NULL;
 
 PSERVER::~PSERVER() {
 	stopServer();
@@ -82,80 +81,10 @@ void PSERVER::connectToWebServ()
 	writeLog("Connection to Server successful");
 }
 
-//void PSERVER::sockCommunication()
-//{
-//	char bufToClient[BUFFER_SIZE];
-//	char bufToServer[BUFFER_SIZE];
-//	ZeroMemory(&bufToClient, sizeof(bufToClient));
-//	ZeroMemory(&bufToServer, sizeof(bufToServer));
-//	int dataForClient = 0;
-//	int dataForServer = 0;
-//	int indexForClient = 0;
-//	int indexForServer = 0;
-//
-//	while (true) {
-//		fd_set sendset;
-//		FD_ZERO(&sendset);
-//		FD_SET(client_socket, &sendset);
-//		FD_SET(server_socket, &sendset);
-//		fd_set recset;
-//		FD_ZERO(&recset);
-//		FD_SET(client_socket, &recset);
-//		FD_SET(server_socket, &recset);
-//		timeval timeout{ 1, 0 };
-//		int readySock = select(0, &sendset, nullptr, /*&recset,*/ nullptr, &timeout);
-//		if (readySock == SOCKET_ERROR) {
-//			closeConnection();
-//			throw ServException("Select function error: ", WSAGetLastError());
-//		}
-//		if (FD_ISSET(server_socket, &sendset)) {
-//			if (dataForClient == 0) {
-//				int rec_data = recv(server_socket, bufToClient, BUFFER_SIZE, 0);
-//				if (rec_data == SOCKET_ERROR) {
-//					closeConnection();
-//					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
-//				}
-//				dataForClient = rec_data;
-//				indexForClient = 0;
-//			}
-//		}
-//		if (FD_ISSET(client_socket, &sendset)) {
-//			if (dataForServer == 0) {
-//				int rec_data = recv(client_socket, bufToServer, BUFFER_SIZE, 0);
-//				if (rec_data == SOCKET_ERROR) {
-//					closeConnection();
-//					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
-//				}
-//				dataForServer = rec_data;
-//				indexForServer = 0;
-//			}
-//		}
-//		if (FD_ISSET(server_socket, &recset)) {
-//			if (dataForServer > 0) {
-//				int send_data = send(server_socket, bufToServer + indexForServer, dataForServer, 0);
-//				if (send_data == SOCKET_ERROR) {
-//					closeConnection();
-//					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
-//				}
-//				dataForServer -= send_data;
-//				indexForServer += send_data;
-//			}
-//		}
-//		if (FD_ISSET(client_socket, &recset)) {
-//			if (dataForClient > 0) {
-//				int send_data = send(client_socket, bufToClient + indexForClient, dataForClient, 0);
-//				if (send_data == SOCKET_ERROR) {
-//					closeConnection();
-//					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
-//				}
-//				dataForClient -= send_data;
-//				indexForClient += send_data;
-//			}
-//		}
-//	}
-//}
-
 void PSERVER::sockCommunication() {
+
+	WSANETWORKEVENTS clientEvents;
+	WSANETWORKEVENTS serverEvents;
 	char bufToClient[BUFFER_SIZE];
 	char bufToServer[BUFFER_SIZE];
 	ZeroMemory(&bufToClient, sizeof(bufToClient));
@@ -165,98 +94,90 @@ void PSERVER::sockCommunication() {
 	int indexForClient = 0;
 	int indexForServer = 0;
 
-	bufToClientHasData = WSACreateEvent();
-	if (bufToClientHasData == WSA_INVALID_EVENT) {
-		closeConnection();
-		throw ServException("Create WSA Event failed: ", WSAGetLastError());
-	}
-
-	bufToServHasData = WSACreateEvent();
-	if (bufToServHasData == WSA_INVALID_EVENT) {
-		closeConnection();
-		throw ServException("Create WSA Event failed: ", WSAGetLastError());
-	}
+	createSocketEvents();
+	HANDLE eventArr[5] = { serviceStopEvent, clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
 
 	while (true) {
-		
-		clientReadySend = WSACreateEvent();
-		if (clientReadySend == WSA_INVALID_EVENT) {
-			closeConnection();
-			throw ServException("Create WSA Event failed: ", WSAGetLastError());
-		}
-		serverReadySend = WSACreateEvent();
-		if (serverReadySend == WSA_INVALID_EVENT) {
-			closeConnection();
-			throw ServException("Create WSA Event failed: ", WSAGetLastError());
-		}
-
-		if (WSAEventSelect(client_socket, clientReadySend, FD_READ | FD_CLOSE) != 0) {
-			closeConnection();
-			throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
-		}
-
-		if (WSAEventSelect(server_socket, serverReadySend, FD_READ | FD_CLOSE) != 0) {
-			closeConnection();
-			throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
-		}
-
-		HANDLE eventArr[5] = { serviceStopEvent, clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
 
 		int eventResult = WSAWaitForMultipleEvents(5, eventArr, FALSE, INFINITE, FALSE);
 		if (eventResult == WSA_WAIT_FAILED) {
 			closeConnection();
 			throw ServException("Error while waiting for events: ", WSAGetLastError());
 		}
-		
+
 		if (eventResult == WSA_WAIT_EVENT_0) {
 			closeConnection();
 			throw ServException("Connection has been severed: ", WSAGetLastError());
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 1) && (dataForServer == 0)) {
+		errState  = WSAEnumNetworkEvents(client_socket, clientReadySend, &clientEvents);
+		if (errState == SOCKET_ERROR) {
+			closeConnection();
+			throw ServException("Error while getting information about events: ", WSAGetLastError());
+		}
+
+		errState = WSAEnumNetworkEvents(server_socket, serverReadySend, &serverEvents);
+		if (errState == SOCKET_ERROR) {
+			closeConnection();
+			throw ServException("Error while getting information about events: ", WSAGetLastError());
+		}
+
+		if (clientEvents.lNetworkEvents & FD_CLOSE) { // poslat zbýtek dat?
+			closeConnection();
+			throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+		}
+
+		if (serverEvents.lNetworkEvents & FD_CLOSE) { // poslat zbýtek dat?
+			closeConnection();
+			throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+		}
+
+		if ((clientEvents.lNetworkEvents & FD_READ) && (dataForServer == 0)) {
 			int rec_data = recv(client_socket, bufToServer, BUFFER_SIZE, 0);
 			if (rec_data == SOCKET_ERROR) {
 				closeConnection();
 				throw ServException("Connection with the client has been severed: ", WSAGetLastError());
 			}
-			/*if (rec_data < BUFFER_SIZE) {
-				WSAResetEvent(clientReadySend);
-			}*/
 			dataForServer = rec_data;
 			indexForServer = 0;
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 2) && (dataForClient == 0)) {
+		if ((serverEvents.lNetworkEvents & FD_READ) && (dataForClient == 0)) {
 			int rec_data = recv(server_socket, bufToClient, BUFFER_SIZE, 0);
 			if (rec_data == SOCKET_ERROR) {
 				closeConnection();
 				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
 			}
-			/*if (rec_data < BUFFER_SIZE) {
-				WSAResetEvent(serverReadySend);
-			}*/
 			dataForClient = rec_data;
 			indexForClient = 0;
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 3) || (dataForServer != 0)) {
+		if (dataForServer != 0) {
 			int send_data = send(server_socket, bufToServer + indexForServer, dataForServer, 0);
 			if (send_data == SOCKET_ERROR) {
-				closeConnection();
-				throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+				if (WSAGetLastError() != WSAEWOULDBLOCK) {
+					closeConnection();
+					throw ServException("Connection with the server has been severed: ", WSAGetLastError());
+				}
 			}
-			dataForServer -= send_data;
-			indexForServer += send_data;
+			else {
+				dataForServer -= send_data;
+				indexForServer += send_data;
+			}
 		}
 
-		if ((eventResult == WSA_WAIT_EVENT_0 + 4) || (dataForClient != 0)) {
+		if (dataForClient != 0) {
 			int send_data = send(client_socket, bufToClient + indexForClient, dataForClient, 0);
 			if (send_data == SOCKET_ERROR) {
-				closeConnection();
-				throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+				if (WSAGetLastError() != WSAEWOULDBLOCK) {
+					closeConnection();
+					throw ServException("Connection with the client has been severed: ", WSAGetLastError());
+				}
 			}
-			dataForClient -= send_data;
-			indexForClient += send_data;
+			else {
+				dataForClient -= send_data;
+				indexForClient += send_data;
+			}
 		}
 
 		if (dataForClient != 0) {
@@ -272,11 +193,47 @@ void PSERVER::sockCommunication() {
 		else {
 			WSAResetEvent(bufToServHasData);
 		}
-
-		WSACloseEvent(clientReadySend);
-		WSACloseEvent(serverReadySend);
 	}
 }
+
+void PSERVER::createSocketEvents() {
+
+	bufToClientHasData = WSACreateEvent();
+	if (bufToClientHasData == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	bufToServHasData = WSACreateEvent();
+	if (bufToServHasData == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	clientReadySend = WSACreateEvent();
+	if (clientReadySend == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	serverReadySend = WSACreateEvent();
+	if (serverReadySend == WSA_INVALID_EVENT) {
+		closeConnection();
+		throw ServException("Create WSA Event failed: ", WSAGetLastError());
+	}
+
+	if (WSAEventSelect(client_socket, clientReadySend, FD_READ | FD_CLOSE) != 0) {
+		closeConnection();
+		throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
+	}
+
+	if (WSAEventSelect(server_socket, serverReadySend, FD_READ | FD_CLOSE) != 0) {
+		closeConnection();
+		throw ServException("WSAEventSelect function failed: ", WSAGetLastError());
+	}
+
+}
+
 void PSERVER::closeConnection()
 {
 	WSACloseEvent(bufToClientHasData);
@@ -289,14 +246,13 @@ void PSERVER::closeConnection()
 	closesocket(client_socket);
 }
 
+
 void PSERVER::startServer()
 {
 	try
 	{
 		initSockets();
-		//
 		createSockInfo("127.0.0.1", "4444", &lisSockInfo);
-		//
 		createNewSocket(lis_socket, lisSockInfo);
 		bindSocket();
 		listenState();
