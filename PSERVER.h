@@ -23,10 +23,11 @@ private:
 	void acceptConnection();
 	void connectToWebServ();
 	void sockCommunication();
+	void createSocketEvents();
 	void closeConnection();
 	void stopServer();
 public:
-	static HANDLE serviceStopEvent;
+	HANDLE serviceStopEvent;
 private:
 	addrinfo* lisSockInfo;
 	addrinfo* webSockInfo;
