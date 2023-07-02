@@ -12,7 +12,8 @@ public:
 	{
 	}
 	~PSERVER();
-	void startServer();
+	void serverInitialization();
+	void serverHandler();
 
 private:
 	void initSockets();
