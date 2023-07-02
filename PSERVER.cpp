@@ -7,6 +7,25 @@
 
 PSERVER::~PSERVER() {
 	stopServer();
+	writeLog("Proxy server was stopped");
+}
+
+void PSERVER::serverInitialization()
+{
+	initSockets();
+	createSockInfo("127.0.0.1", "4444", &lisSockInfo);
+	createNewSocket(lis_socket, lisSockInfo);
+	bindSocket();
+	listenState();
+}
+
+void PSERVER::serverHandler()
+{
+	acceptConnection();
+	createSockInfo("127.0.0.1", "4445", &webSockInfo);
+	createNewSocket(server_socket, webSockInfo);
+	connectToWebServ();
+	sockCommunication();
 }
 
 
@@ -63,7 +82,7 @@ void PSERVER::acceptConnection()
 	sockaddr_in clientSockInfo;
 	ZeroMemory(&clientSockInfo, sizeof(clientSockInfo));
 	int clientSize = sizeof(clientSockInfo);
-	client_socket = accept(lis_socket, (sockaddr*) & clientSockInfo, &clientSize);
+	client_socket = accept(lis_socket, (sockaddr*)&clientSockInfo, &clientSize);
 	if (client_socket == INVALID_SOCKET) {
 		throw ServException("Client connection error: ", WSAGetLastError());
 	}
@@ -110,7 +129,7 @@ void PSERVER::sockCommunication() {
 			throw ServException("Connection has been severed: ", WSAGetLastError());
 		}
 
-		errState  = WSAEnumNetworkEvents(client_socket, clientReadySend, &clientEvents);
+		errState = WSAEnumNetworkEvents(client_socket, clientReadySend, &clientEvents);
 		if (errState == SOCKET_ERROR) {
 			closeConnection();
 			throw ServException("Error while getting information about events: ", WSAGetLastError());
@@ -244,39 +263,6 @@ void PSERVER::closeConnection()
 	shutdown(client_socket, SD_BOTH);
 	closesocket(server_socket);
 	closesocket(client_socket);
-}
-
-
-void PSERVER::startServer()
-{
-	try
-	{
-		initSockets();
-		createSockInfo("127.0.0.1", "4444", &lisSockInfo);
-		createNewSocket(lis_socket, lisSockInfo);
-		bindSocket();
-		listenState();
-		while (true) {
-			try
-			{
-				acceptConnection();
-				createSockInfo("127.0.0.1", "4445", &webSockInfo);
-				createNewSocket(server_socket, webSockInfo);
-				connectToWebServ();
-				sockCommunication();
-			}
-			catch (const ServException& ex)
-			{
-				std::string ErrorCode = std::to_string(ex.GetErrorCode());
-				writeLog(ex.GetErrorType() + ErrorCode);
-			}
-		}
-	}
-	catch (const ServException& ex)
-	{
-		std::string ErrorCode = std::to_string(ex.GetErrorCode());
-		writeLog(ex.GetErrorType() + ErrorCode);
-	}
 }
 
 void PSERVER::stopServer()
