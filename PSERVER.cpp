@@ -13,7 +13,7 @@ PSERVER::~PSERVER() {
 void PSERVER::serverInitialization()
 {
 	initSockets();
-	createSockInfo("127.0.0.1", "4444", &lisSockInfo);
+	createSockInfo("127.0.0.1", listeningPort, &lisSockInfo);
 	createNewSocket(lis_socket, lisSockInfo);
 	bindSocket();
 	listenState();
@@ -22,7 +22,7 @@ void PSERVER::serverInitialization()
 void PSERVER::serverHandler()
 {
 	acceptConnection();
-	createSockInfo("127.0.0.1", "4445", &webSockInfo);
+	createSockInfo(serverIP, serverPort, &webSockInfo);
 	createNewSocket(server_socket, webSockInfo);
 	connectToWebServ();
 	sockCommunication();
