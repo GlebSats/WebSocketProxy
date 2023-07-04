@@ -30,7 +30,7 @@ private:
 	void closeConnection();
 	void stopServer();
 public:
-	HANDLE serviceStopEvent;
+	HANDLE* serviceStopEvent;
 private:
 	const char* listeningPort;
 	const char* serverIP;
