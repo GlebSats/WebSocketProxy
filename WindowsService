@@ -1,8 +1,13 @@
 #include <Windows.h>
 #include <tchar.h>
 #include <strsafe.h>
+#include "PSERVER.h"
+#include "ServException.h"
+#include "writeLog.h"
+
+#pragma comment(lib, "Ws2_32.lib")
 // Global Variables
-TCHAR SVCNAME[] = L"winService";
+TCHAR SVCNAME[] = L"webSocketProxy";
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle;
 HANDLE serviceStopEvent = NULL;
@@ -34,7 +39,7 @@ int _tmain(int argc, TCHAR* argv[])
 
         if (!StartServiceCtrlDispatcher(DispatchTable))
         {
-            //SvcReportEvent(TEXT("StartServiceCtrlDispatcher"));
+            //log
         }
         return 0;
     }
@@ -43,7 +48,7 @@ int _tmain(int argc, TCHAR* argv[])
 VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv) {
     serviceStatusHandle = RegisterServiceCtrlHandlerW(SVCNAME, winServiceHandler);
     if (serviceStatusHandle == 0) {
-        //SvcReportEvent(TEXT("RegisterServiceCtrlHandler"));
+        //log
         return;
     }
 
@@ -61,8 +66,11 @@ VOID WINAPI winServiceHandler(DWORD controlCode) {
     {
 
     case SERVICE_CONTROL_STOP:
+        ReportWinServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
+        
         SetEvent(serviceStopEvent);
-        ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+
+        ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 3000);
 
     default:
         break;
@@ -94,20 +102,40 @@ VOID ReportWinServiceStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
 }
 
 VOID InitWinService(DWORD Argc, LPTSTR* Argv) {
-    
+
     serviceStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (serviceStopEvent == NULL) {
         ReportWinServiceStatus(SERVICE_STOPPED, GetLastError(), 0);
     }
     else {
-        //
-        // Funkce initSockets - listenState
-        //
-        ReportWinServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
+        // 
+        PSERVER server("4444", "127.0.0.1", "4445");
+        server.serviceStopEvent = &serviceStopEvent;
         
-        while (WaitForSingleObject(serviceStopEvent, 0) != WAIT_OBJECT_0) {
-            // Funkce acceptConnection - sockCommunication
+        try
+        {
+            server.serverInitialization();
+            ReportWinServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
+
+            while (WaitForSingleObject(serviceStopEvent, 0) != WAIT_OBJECT_0) {
+                try
+                {
+                    server.serverHandler();
+                }
+                catch (const ServException& ex)
+                {
+                    std::string ErrorCode = std::to_string(ex.GetErrorCode());
+                    writeLog(ex.GetErrorType() + ErrorCode);
+                }
+            }
         }
+        catch (const ServException& ex)
+        {
+            std::string ErrorCode = std::to_string(ex.GetErrorCode());
+            writeLog(ex.GetErrorType() + ErrorCode);
+            ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+        }
+       
         ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
     }
 }
@@ -131,9 +159,9 @@ VOID SvcInstall() {
         printf("OpenSCManager failed (%d)\n", GetLastError());
         return;
     }
-    // nebo SERVICE_AUTO_START
+    // nebo SERVICE_DEMAND_START
     hService = CreateService(hSCManager, SVCNAME, SVCNAME, SERVICE_ALL_ACCESS,
-        SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, szPath, NULL, NULL, NULL, NULL, NULL);
+        SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START, SERVICE_ERROR_NORMAL, szPath, NULL, NULL, NULL, NULL, NULL);
     if (hService == NULL) {
         printf("CreateService failed (%d)\n", GetLastError());
         CloseServiceHandle(hSCManager);
