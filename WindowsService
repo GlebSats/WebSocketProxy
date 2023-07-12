@@ -1,11 +1,13 @@
-#include <Windows.h>
+#define WIN32_LEAN_AND_MEAN
 #include <tchar.h>
 #include <strsafe.h>
 #include "PSERVER.h"
 #include "ServException.h"
 #include "writeLog.h"
+#include <Windows.h>
 
 #pragma comment(lib, "Ws2_32.lib")
+
 // Global Variables
 TCHAR SVCNAME[] = L"webSocketProxy";
 SERVICE_STATUS serviceStatus;
@@ -39,7 +41,7 @@ int _tmain(int argc, TCHAR* argv[])
 
         if (!StartServiceCtrlDispatcher(DispatchTable))
         {
-            //log
+            writeLog("StartServiceCtrlDispatcher function error: " + GetLastError());
         }
         return 0;
     }
@@ -48,7 +50,7 @@ int _tmain(int argc, TCHAR* argv[])
 VOID WINAPI winServiceMain(DWORD Argc, LPTSTR* Argv) {
     serviceStatusHandle = RegisterServiceCtrlHandlerW(SVCNAME, winServiceHandler);
     if (serviceStatusHandle == 0) {
-        //log
+        writeLog("RegisterServiceCtrlHandler function error: " + GetLastError());
         return;
     }
 
@@ -67,7 +69,7 @@ VOID WINAPI winServiceHandler(DWORD controlCode) {
 
     case SERVICE_CONTROL_STOP:
         ReportWinServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
-        
+
         SetEvent(serviceStopEvent);
 
         ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 3000);
@@ -111,7 +113,7 @@ VOID InitWinService(DWORD Argc, LPTSTR* Argv) {
         // 
         PSERVER server("4444", "127.0.0.1", "4445");
         server.serviceStopEvent = &serviceStopEvent;
-        
+
         try
         {
             server.serverInitialization();
@@ -135,7 +137,7 @@ VOID InitWinService(DWORD Argc, LPTSTR* Argv) {
             writeLog(ex.GetErrorType() + ErrorCode);
             ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
         }
-       
+
         ReportWinServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
     }
 }
