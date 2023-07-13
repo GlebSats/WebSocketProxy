@@ -7,15 +7,11 @@
 class PSERVER
 {
 public:
-	PSERVER(const char* listeningPort, const char* serverIP, const char* serverPort): 
-	listeningPort(listeningPort), serverIP(serverIP), serverPort(serverPort),lis_socket(-1), client_socket(-1),
-	server_socket(-1), errState(0), bufToClientHasData(WSA_INVALID_EVENT), bufToServHasData(WSA_INVALID_EVENT),
-	clientReadySend(WSA_INVALID_EVENT), serverReadySend(WSA_INVALID_EVENT)
-	{
-	}
+	PSERVER(const char* listeningPort, const char* serverIP, const char* serverPort);
 	~PSERVER();
 	void serverInitialization();
 	void serverHandler();
+	void stopServer();
 
 private:
 	void initSockets(); // Function initiates use of the Winsock DLL
@@ -28,7 +24,8 @@ private:
 	void sockCommunication();
 	void createSocketEvents();
 	void closeConnection();
-	void stopServer();
+	PSERVER(const PSERVER&) = delete; // Copy not allowed
+	void operator=(const PSERVER&) = delete; // Assignment not allowed
 public:
 	HANDLE* serviceStopEvent;
 private:
