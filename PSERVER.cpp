@@ -114,7 +114,7 @@ void PSERVER::sockCommunication() {
 	int indexForServer = 0;
 
 	createSocketEvents();
-	HANDLE eventArr[5] = { serviceStopEvent, clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
+	HANDLE eventArr[5] = { *serviceStopEvent, clientReadySend, serverReadySend, bufToServHasData, bufToClientHasData };
 
 	while (true) {
 
