@@ -3,11 +3,17 @@
 #include "writeLog.h"
 #include <string>
 
-#define BUFFER_SIZE 5
+#define BUFFER_SIZE 1024
+PSERVER:: PSERVER(const char* listeningPort, const char* serverIP, const char* serverPort) : lisSockInfo(nullptr),
+webSockInfo(nullptr), serviceStopEvent(nullptr),listeningPort(listeningPort), 
+serverIP(serverIP), serverPort(serverPort), lis_socket(-1), client_socket(-1),
+server_socket(-1), errState(0), bufToClientHasData(WSA_INVALID_EVENT), bufToServHasData(WSA_INVALID_EVENT),
+clientReadySend(WSA_INVALID_EVENT), serverReadySend(WSA_INVALID_EVENT)
+{
+}
 
 PSERVER::~PSERVER() {
 	stopServer();
-	writeLog("Proxy server was stopped");
 }
 
 void PSERVER::serverInitialization()
@@ -28,7 +34,7 @@ void PSERVER::serverHandler()
 	sockCommunication();
 }
 
-
+// Je třeba upravit
 void PSERVER::initSockets()
 {
 	errState = WSAStartup(MAKEWORD(2, 2), &wsData);
@@ -279,5 +285,7 @@ void PSERVER::stopServer()
 		closesocket(lis_socket);
 	}
 	WSACleanup();
+	
+	writeLog("Proxy server was stopped");
 }
 
